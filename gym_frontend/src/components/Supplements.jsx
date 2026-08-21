@@ -20,6 +20,7 @@ function Supplements() {
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const loadItems = async () => {
     const data = await getSupplementList()
@@ -37,6 +38,7 @@ function Supplements() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setErrorMsg('')
 
     const payload = {
       product_name: form.product_name,
@@ -47,16 +49,27 @@ function Supplements() {
       status: form.status
     }
 
+    let result
     if (editingId) {
-      await updateSupplement(editingId, payload)
-      setSupplier('supplement', editingId, form.supplier)
+      result = await updateSupplement(editingId, payload)
+      if (result.success) setSupplier('supplement', editingId, form.supplier)
     } else {
-      await addSupplement(payload)
-      // backend doesn't echo the new id back, so refresh and match on
-      // name as a best-effort fallback for saving the supplier
-      const refreshed = await getSupplementList()
-      const match = [...refreshed].reverse().find((i) => i.product_name === form.product_name)
-      if (match) setSupplier('supplement', match.id, form.supplier)
+      result = await addSupplement(payload)
+      if (result.success) {
+        const newId = result.data && result.data.id
+        if (newId) {
+          setSupplier('supplement', newId, form.supplier)
+        } else {
+          const refreshed = await getSupplementList()
+          const match = [...refreshed].reverse().find((i) => i.product_name === form.product_name)
+          if (match) setSupplier('supplement', match.id, form.supplier)
+        }
+      }
+    }
+
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
     }
 
     setForm(emptyForm)
@@ -78,7 +91,11 @@ function Supplements() {
   }
 
   const handleDelete = async (id) => {
-    await deleteSupplement(id)
+    const result = await deleteSupplement(id)
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
+    }
     removeSupplier('supplement', id)
     loadItems()
   }
@@ -86,6 +103,7 @@ function Supplements() {
   const handleCancel = () => {
     setForm(emptyForm)
     setEditingId(null)
+    setErrorMsg('')
   }
 
   const filteredItems = useMemo(() => {
@@ -104,6 +122,8 @@ function Supplements() {
       <p className="section-sub">Add, view, edit, delete and search supplement inventory.</p>
 
       <form className="form" onSubmit={handleSubmit}>
+        {errorMsg && <p className="form-error">{errorMsg}</p>}
+
         <input name="product_name" placeholder="Product Name" value={form.product_name} onChange={handleChange} required />
 
         <select name="category" value={form.category} onChange={handleChange}>
@@ -139,8 +159,8 @@ function Supplements() {
         {filteredItems.map((item) => (
           <div className="product-card" key={item.id}>
             <img
-              src={getSupplementImage(item.category)}
-              alt={item.category}
+              src={item.image_url || getSupplementImage(item.category)}
+              alt={item.product_name}
               loading="lazy"
               onError={(e) => {
                 if (e.target.src !== supplementImages.default) e.target.src = supplementImages.default

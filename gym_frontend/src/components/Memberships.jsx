@@ -13,6 +13,7 @@ function Memberships() {
   const [plans, setPlans] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
+  const [errorMsg, setErrorMsg] = useState('')
 
   const loadAll = async () => {
     const [membershipData, memberData, planData] = await Promise.all([
@@ -35,21 +36,24 @@ function Memberships() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setErrorMsg('')
 
-    if (editingId) {
-      // update only allows changing dates/status, member and plan stay fixed
-      await updateMembership(editingId, {
-        start_date: form.start_date,
-        end_date: form.end_date,
-        status: form.status
-      })
-    } else {
-      await addMembership({
-        member_id: Number(form.member_id),
-        plan_id: Number(form.plan_id),
-        start_date: form.start_date,
-        end_date: form.end_date
-      })
+    const result = editingId
+      ? await updateMembership(editingId, {
+          start_date: form.start_date,
+          end_date: form.end_date,
+          status: form.status
+        })
+      : await addMembership({
+          member_id: Number(form.member_id),
+          plan_id: Number(form.plan_id),
+          start_date: form.start_date,
+          end_date: form.end_date
+        })
+
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
     }
 
     setForm(emptyForm)
@@ -69,13 +73,18 @@ function Memberships() {
   }
 
   const handleDelete = async (id) => {
-    await deleteMembership(id)
+    const result = await deleteMembership(id)
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
+    }
     loadAll()
   }
 
   const handleCancel = () => {
     setForm(emptyForm)
     setEditingId(null)
+    setErrorMsg('')
   }
 
   return (
@@ -84,6 +93,8 @@ function Memberships() {
       <p className="section-sub">Link members to plans and track active memberships.</p>
 
       <form className="form" onSubmit={handleSubmit}>
+        {errorMsg && <p className="form-error">{errorMsg}</p>}
+
         <select name="member_id" value={form.member_id} onChange={handleChange} required disabled={!!editingId}>
           <option value="">Select Member</option>
           {members.map((m) => (

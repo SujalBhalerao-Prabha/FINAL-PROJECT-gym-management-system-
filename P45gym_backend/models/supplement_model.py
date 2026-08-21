@@ -10,3 +10,4 @@ class Supplement(db.Model):
     stock_quantity = db.Column(db.Integer, nullable=False, default=0)
     expiry_date = db.Column(db.String(20), nullable=True)
     status = db.Column(db.String(30), nullable=False, default="In Stock")
+    image_url = db.Column(db.String(255))

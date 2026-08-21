@@ -7,6 +7,7 @@ function Members() {
   const [members, setMembers] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
+  const [errorMsg, setErrorMsg] = useState('')
 
   const loadMembers = async () => {
     const data = await getMembers()
@@ -23,13 +24,17 @@ function Members() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setErrorMsg('')
 
     const payload = { ...form, age: Number(form.age) }
 
-    if (editingId) {
-      await updateMember(editingId, payload)
-    } else {
-      await addMember(payload)
+    const result = editingId
+      ? await updateMember(editingId, payload)
+      : await addMember(payload)
+
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
     }
 
     setForm(emptyForm)
@@ -48,13 +53,18 @@ function Members() {
   }
 
   const handleDelete = async (id) => {
-    await deleteMember(id)
+    const result = await deleteMember(id)
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
+    }
     loadMembers()
   }
 
   const handleCancel = () => {
     setForm(emptyForm)
     setEditingId(null)
+    setErrorMsg('')
   }
 
   return (
@@ -63,6 +73,8 @@ function Members() {
       <p className="section-sub">Add, view, edit and delete gym members.</p>
 
       <form className="form" onSubmit={handleSubmit}>
+        {errorMsg && <p className="form-error">{errorMsg}</p>}
+
         <input name="name" placeholder="Name" value={form.name} onChange={handleChange} required />
         <input name="email" placeholder="Email" value={form.email} onChange={handleChange} required />
         <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} required />

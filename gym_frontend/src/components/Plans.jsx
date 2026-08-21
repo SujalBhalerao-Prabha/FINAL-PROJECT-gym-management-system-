@@ -7,6 +7,7 @@ function Plans() {
   const [plans, setPlans] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
+  const [errorMsg, setErrorMsg] = useState('')
 
   const loadPlans = async () => {
     const data = await getPlans()
@@ -23,6 +24,7 @@ function Plans() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setErrorMsg('')
 
     const payload = {
       ...form,
@@ -30,10 +32,13 @@ function Plans() {
       price: Number(form.price)
     }
 
-    if (editingId) {
-      await updatePlan(editingId, payload)
-    } else {
-      await addPlan(payload)
+    const result = editingId
+      ? await updatePlan(editingId, payload)
+      : await addPlan(payload)
+
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
     }
 
     setForm(emptyForm)
@@ -52,13 +57,18 @@ function Plans() {
   }
 
   const handleDelete = async (id) => {
-    await deletePlan(id)
+    const result = await deletePlan(id)
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
+    }
     loadPlans()
   }
 
   const handleCancel = () => {
     setForm(emptyForm)
     setEditingId(null)
+    setErrorMsg('')
   }
 
   return (
@@ -67,6 +77,8 @@ function Plans() {
       <p className="section-sub">Manage gym membership plans.</p>
 
       <form className="form" onSubmit={handleSubmit}>
+        {errorMsg && <p className="form-error">{errorMsg}</p>}
+
         <input name="plan_name" placeholder="Plan Name" value={form.plan_name} onChange={handleChange} required />
         <input name="duration_months" type="number" placeholder="Duration (months)" value={form.duration_months} onChange={handleChange} required />
         <input name="price" type="number" placeholder="Price" value={form.price} onChange={handleChange} required />

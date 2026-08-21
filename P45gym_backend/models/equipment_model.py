@@ -9,3 +9,4 @@ class Equipment(db.Model):
     price = db.Column(db.Float, nullable=False)
     stock_quantity = db.Column(db.Integer, nullable=False, default=0)
     status = db.Column(db.String(30), nullable=False, default="In Stock")
+    image_url = db.Column(db.String(255))

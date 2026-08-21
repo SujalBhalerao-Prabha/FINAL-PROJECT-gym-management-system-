@@ -19,6 +19,7 @@ function Equipment() {
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const loadItems = async () => {
     const data = await getEquipmentList()
@@ -36,6 +37,7 @@ function Equipment() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setErrorMsg('')
 
     const payload = {
       product_name: form.product_name,
@@ -45,20 +47,27 @@ function Equipment() {
       status: form.status
     }
 
+    let result
     if (editingId) {
-      await updateEquipment(editingId, payload)
-      setSupplier('equipment', editingId, form.supplier)
+      result = await updateEquipment(editingId, payload)
+      if (result.success) setSupplier('equipment', editingId, form.supplier)
     } else {
-      const created = await addEquipment(payload)
-      if (created && created.id) {
-        setSupplier('equipment', created.id, form.supplier)
-      } else {
-        // backend doesn't echo the new id back, so refresh and match on
-        // name as a best-effort fallback for saving the supplier
-        const refreshed = await getEquipmentList()
-        const match = [...refreshed].reverse().find((i) => i.product_name === form.product_name)
-        if (match) setSupplier('equipment', match.id, form.supplier)
+      result = await addEquipment(payload)
+      if (result.success) {
+        const newId = result.data && result.data.id
+        if (newId) {
+          setSupplier('equipment', newId, form.supplier)
+        } else {
+          const refreshed = await getEquipmentList()
+          const match = [...refreshed].reverse().find((i) => i.product_name === form.product_name)
+          if (match) setSupplier('equipment', match.id, form.supplier)
+        }
       }
+    }
+
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
     }
 
     setForm(emptyForm)
@@ -79,7 +88,11 @@ function Equipment() {
   }
 
   const handleDelete = async (id) => {
-    await deleteEquipment(id)
+    const result = await deleteEquipment(id)
+    if (!result.success) {
+      setErrorMsg(result.message || 'Something went wrong, please try again')
+      return
+    }
     removeSupplier('equipment', id)
     loadItems()
   }
@@ -87,6 +100,7 @@ function Equipment() {
   const handleCancel = () => {
     setForm(emptyForm)
     setEditingId(null)
+    setErrorMsg('')
   }
 
   const filteredItems = useMemo(() => {
@@ -105,6 +119,8 @@ function Equipment() {
       <p className="section-sub">Add, view, edit, delete and search gym equipment inventory.</p>
 
       <form className="form" onSubmit={handleSubmit}>
+        {errorMsg && <p className="form-error">{errorMsg}</p>}
+
         <input name="product_name" placeholder="Product Name" value={form.product_name} onChange={handleChange} required />
 
         <select name="category" value={form.category} onChange={handleChange}>
@@ -139,8 +155,8 @@ function Equipment() {
         {filteredItems.map((item) => (
           <div className="product-card" key={item.id}>
             <img
-              src={getEquipmentImage(item.category)}
-              alt={item.category}
+              src={item.image_url || getEquipmentImage(item.category)}
+              alt={item.product_name}
               loading="lazy"
               onError={(e) => {
                 if (e.target.src !== equipmentImages.default) e.target.src = equipmentImages.default
